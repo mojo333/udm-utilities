@@ -1,75 +1,57 @@
 # UDM / UDMPro Boot Script
-### Features
+
+## Features
+
 1. Allows you to run a shell script at S95 anytime your UDM starts / reboots
+1. Persists through reboot and **firmware updates**! It is able to do this because Ubiquiti caches all debian package installs on the UDM in /mnt/data, then re-installs them on every boot
 
-### Compatiblity
+## Compatibility
+
 1. Should work on any UDM/UDMPro after 1.6.3
-2. Tested and confirmed on 1.6.6, 1.7.0, 1.7.2rc4
+2. Tested and confirmed on 1.6.6, 1.7.0, 1.7.2rc4, 1.7.3rc1, 1.8.0rc7
 
+### Upgrade from earlier way
+
+* As long as you didn't change the filenames, installing the deb package is all you need to do.  If you want to clean up beforehand anyways....
+
+    ```bash
+    rm /etc/init.d/udm.sh
+    systemctl disable udmboot
+    rm /etc/systemd/system/udmboot.service
+    ```
+
+* The new package is exactly the old steps packaged in a debian package
+* [dpkg-build-files](dpkg-build-files) contains the scripts that build the package (using dh_make and debuild) if you want to build it yourself / change it
+* Built on Ubuntu-20.04 on Windows 10/WSL2
 
 ## Steps
-# 1. Make your script on the UDM/UDMPRO
-```
-vi /mnt/data/on_boot.sh 
-chmod u+x /mnt/data/on_boot.sh
-```
-Example: see examples/udm-files/on_boot.sh
-```
-#!/bin/sh
-podman start wpa_supplicant-udmpro
 
-iptables -t nat -C PREROUTING -p udp ! --source 10.0.0.x ! --destination 10.0.0.x --dport 53 -j DNAT --to 10.0.0.x || iptables -t nat -A PREROUTING -p udp ! --source 10.0.0.x ! --destination 10.0.0.x --dport 53 -j DNAT --to 10.0.0.x
-iptables -t nat -C PREROUTING -p tcp ! --source 10.0.0.x ! --destination 10.0.0.x --dport 53 -j DNAT --to 10.0.0.x || iptables -t nat -A PREROUTING -p tcp ! --source 10.0.0.x ! --destination 10.0.0.x --dport 53 -j DNAT --to 10.0.0.x
-iptables -t nat -C POSTROUTING -j MASQUERADE || iptables -t nat -A POSTROUTING -j MASQUERADE
-```
+1. Get into the unifios shell on your udm
 
+    ```bash
+    unifi-os shell
+    ```
 
-# 2. Make the unifios docker container execute this script on startup, this has to be done after every firmware update.  It does persist through reboots.
+2. Download [udm-boot_1.0.1-1_all.deb](packages/udm-boot_1.0.1-1_all.deb) and install it and go back to the UDM
 
-## Automatic
+    ```bash
+    curl -L https://raw.githubusercontent.com/boostchicken/udm-utilities/master/on-boot-script/packages/udm-boot_1.0.1-1_all.deb -o udm-boot_1.0.1-1_all.deb
+    dpkg -i udm-boot_1.0.1-1_all.deb
+    exit
+    ```
 
-1. Copy install.sh and install-unifios.sh to your UDM
-2. Execute install.sh
+3. Copy any shell scripts you want to run to /mnt/data/on_boot.d on your UDM (not the unifi-os shell)and make sure they are executable and have the correct shebang (#!/bin/sh)
 
-## Manual
-```
-podman exec -it unifi-os sh
-```
-### make a script that sshs to the udm and runs on our boot script
-Example: examples/unifi-os-files/udm.sh
-```
-echo "#!/bin/sh
-ssh -o StrictHostKeyChecking=no root@127.0.1.1 '/mnt/data/on_boot.sh'" > /etc/init.d/udm.sh # 127.0.1.1 always points to the UDM
-```
-#### make said script executable
-```
-chmod u+x /etc/init.d/udm.sh
-```
-### make a service that runs on startup, after we have networking
-Example: examples/unifi-os-files/udmboot.service
-```
-echo "[Unit]
-Description=Run On Startup UDM
+    Examples:
+    * Start a DNS Container [10-dns.sh](../dns-common/on_boot.d/10-dns.sh)
+    * Start wpa_supplicant [on_boot.d/10-wpa_supplicant.sh](examples/udm-files/on_boot.d/10-wpa_supplicant.sh)
 
-[Service]
-After=network.target
-ExecStart=/etc/init.d/udm.sh
+## Version History
 
-[Install]
-WantedBy=multi-user.target" > /etc/systemd/system/udmboot.service
-```
+### 1.0.1
 
-### enable it and test
-```
-systemctl enable udmboot
-systemctl start udmboot
-```
-### back to the udm
-```
-exit
-```
-# reboot your udm/udmpro and make sure it worked
-```
-reboot
-exit
-```
+* Fully automated install, all that is left is populating /mnt/data/on_boot.d
+
+### 1.0.0
+
+* First release that persists through firmware
