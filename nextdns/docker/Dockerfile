@@ -1,3 +1,6 @@
+FROM docker.io/project31/aarch64-alpine-qemu:3.5.4
+RUN [ "cross-build-start" ]
+
 FROM alpine as builder
 ENV VERSION=1.7.1
 LABEL maintainer="John Dorman <dorman@ataxia.cloud>"
@@ -9,3 +12,5 @@ RUN apk add --no-cache ca-certificates
 COPY --from=builder /tmp/nextdns /opt/nextdns
 EXPOSE 53/tcp 53/udp
 ENTRYPOINT ["/opt/nextdns/nextdns","run", "-config-file", "/etc/nextdns/nextdns.conf"]
+
+RUN [ "cross-build-end" ]
